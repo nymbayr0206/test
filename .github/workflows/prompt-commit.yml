@@ -1,0 +1,40 @@
+name: Prompt Commit
+on:
+  issues:
+    types: [opened, edited]
+permissions:
+  contents: write
+  issues: write
+jobs:
+  apply:
+    if: contains(github.event.issue.labels.*.name, 'prompt')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: main}
+      - name: Extract form values
+        id: f
+        run: |
+          PATH_LINE=$(jq -r '.issue.body' "$GITHUB_EVENT_PATH" | sed -n 's/^### File path$//;t;n;/```/q;p' )
+      - name: Parse body (jq)
+        id: parse
+        run: |
+          BODY=$(jq -r '.issue.body' "$GITHUB_EVENT_PATH")
+          FILE=$(echo "$BODY" | awk '/File path/{flag=1;next}/^$/{flag=0}flag' | head -1)
+          CONTENT=$(echo "$BODY" | awk '/New file content/{flag=1;next}/^$/{if (flag && seen) exit}flag{seen=1} /^```/{c=!c;next} c')
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          printf "%s" "$CONTENT" > newcontent.txt
+      - name: Write file
+        run: |
+          mkdir -p "$(dirname "${{ steps.parse.outputs.file }}")"
+          cp newcontent.txt "${{ steps.parse.outputs.file }}"
+      - name: Commit
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "bot: update ${{ steps.parse.outputs.file }}"
+          branch: main
+      - name: Comment back
+        uses: actions-ecosystem/action-create-comment@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          body: "✅ Committed to `${{ steps.parse.outputs.file }}`"

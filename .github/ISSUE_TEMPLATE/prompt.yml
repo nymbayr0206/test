@@ -1,0 +1,13 @@
+name: Prompt change
+description: Ask the bot to write/update a file
+title: "bot: change"
+labels: ["prompt"]
+body:
+  - type: input
+    id: path
+    attributes: {label: File path, placeholder: "components/Events.js"}
+    validations: {required: true}
+  - type: textarea
+    id: content
+    attributes: {label: New file content, render: bash}
+    validations: {required: true}
